@@ -9,28 +9,34 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <assert.h>
 
 int plugin_is_GPL_compatible;
 
 struct bb_plugin_options {
-	char *output;
 	FILE *output_file;
 };
 
 static struct bb_plugin_options *plugin_options;
-static struct opt_pass bb_pass = {};
+static struct opt_pass bb_pass;
 
-void bb_diagnostic_start(void *data, void *user)
+int bb_initialize_output(char *filename)
 {
 	if (plugin_options == NULL)
-		return;
-	plugin_options->output_file = fopen(plugin_options->output, "w+");
-	if (plugin_options->output_file == NULL)
+	{
+		fprintf(stderr,
+		        "bb_diagnostic: Options structure not allocated.\n");
+		return 1;
+	}
+
+	if (!(plugin_options->output_file = fopen(filename, "w+")))
 	{
 		fprintf(stderr,
 		        "bb_diagnostic: Could not open output file: %s\n", 
 		        xstrerror(errno));
+		return 1;
 	}
+	return 0;
 }
 
 void bb_diagnostic_stop(void *data, void *user)
@@ -42,33 +48,45 @@ void bb_diagnostic_stop(void *data, void *user)
 
 static unsigned int bb_pass_execute(void)
 {
-	printf("Calling my pass: %s\n", plugin_options->output);
 	function *func = cfun;
 	basic_block bb;
+	FILE *output_file = plugin_options->output_file;
+	unsigned int function_size = 0;
 
-	printf("Function name: %s\n", IDENTIFIER_POINTER(DECL_NAME(func->decl)));
+	fprintf(output_file,
+	        "Function: %s\n", IDENTIFIER_POINTER(DECL_NAME(func->decl)));
 
 	if (!func->cfg)
-	{
-		printf("This function has no CFG.\n");
 		return 0;
-	}
 
 	FOR_EACH_BB_FN(bb, func)
 	{
-		printf("basic block: %d\n", bb->index);
+		unsigned int bb_size = 0;
 		rtx insn;
+		fprintf(output_file,
+		        "bb %d, ", bb->index);
+
 		FOR_BB_INSNS(bb, insn)
 		{
 			if NONDEBUG_INSN_P(insn)
 			{
-				printf("len: %d\n", get_attr_length(insn));
+				/*
+				 * It is possible that get_attr_length() returns
+				 * 0. This is the case when the target does not
+				 * need to generate any instructions for a
+				 * particular RTL.
+				 */
+				bb_size+=get_attr_length(insn);
 			}
 		}
+		fprintf(output_file,
+		        "%d\n", bb_size);
+		function_size += bb_size;
 	}
+	fprintf(output_file,
+	        "function, %d\n", function_size);
 	return 0;
 }
-
 
 #if 0
 void bb_diagnostic(void *data, void *user)
@@ -156,9 +174,10 @@ void bb_diagnostic(void *data, void *user)
 }
 #endif
 
-void usage(void)
+int usage(void)
 {
 	printf("usage:\n");
+	return 1;
 }
 
 int plugin_init(struct plugin_name_args *plugin_info,
@@ -167,16 +186,10 @@ int plugin_init(struct plugin_name_args *plugin_info,
 	struct register_pass_info pass_info;
 
 	if (plugin_info->argc != 1)
-	{
-		usage();
-		return 1;
-	}
+		return usage();
 
 	if (strcmp(plugin_info->argv[0].key, "output"))
-	{
-		usage();
-		return 1;
-	}
+		return usage();
 
 	plugin_options = (struct bb_plugin_options*)xmalloc(sizeof(
 		                struct bb_plugin_options));
@@ -184,11 +197,8 @@ int plugin_init(struct plugin_name_args *plugin_info,
 	memset(plugin_options, 0, sizeof(struct bb_plugin_options));
 	memset(&pass_info, 0, sizeof(struct register_pass_info));
 
-	plugin_options->output = (char *)xmalloc(sizeof(char)*
-		                                       strlen(plugin_info->argv[0].value));
-	memcpy(plugin_options->output,
-		     plugin_info->argv[0].value,
-		     strlen(plugin_info->argv[0].value));
+	if (bb_initialize_output(plugin_info->argv[0].value))
+		return 1;
 
 	pass_info.reference_pass_name = "final";
 	pass_info.pos_op = PASS_POS_INSERT_AFTER;
@@ -199,17 +209,13 @@ int plugin_init(struct plugin_name_args *plugin_info,
 	bb_pass.execute = bb_pass_execute;
 
 	register_callback(plugin_info->base_name,
-		PLUGIN_PASS_MANAGER_SETUP, 
-		NULL, 
-		&pass_info);
+	                  PLUGIN_PASS_MANAGER_SETUP,
+	                  NULL,
+	                  &pass_info);
 
 	register_callback(plugin_info->base_name,
-	                  PLUGIN_ALL_PASSES_START,
-										bb_diagnostic_start,
-										NULL);
-	register_callback(plugin_info->base_name,
-	                  PLUGIN_ALL_PASSES_END,
-										bb_diagnostic_stop,
-										NULL);
+	                  PLUGIN_FINISH,
+	                  bb_diagnostic_stop,
+	                  NULL);
 	return 0;
 }
