@@ -1,0 +1,22 @@
+Building:
+
+If you have the GCC plugin developer tools available, you should be
+able to build by simply running 
+
+$ make
+
+To get the GCC plugin developer tools on Ubuntu, load the following
+packages using apt:
+
+apt-get install gcc-x.y-plugin-dev
+
+where x.y corresponds to the version of GCC installed on your computer.
+
+Running:
+
+When compiling with gcc, use these extra command line flags to use the
+plugin:
+
+$ gcc test.c -o a.out -fplugin=<path to bb_stats.so>/bb_stats.so -fplugin-arg-bb_stats-output=<output file>
+
+That should be it!
