@@ -176,7 +176,8 @@ void bb_diagnostic(void *data, void *user)
 
 int usage(void)
 {
-	printf("usage:\n");
+	fprintf(stderr, "usage: -fplugin=<path to bb_stats.so>/bb_stats.so\n");
+	fprintf(stderr, "       -fplugin-arg-bb_stats-output=<output filename>\n");
 	return 1;
 }
 
