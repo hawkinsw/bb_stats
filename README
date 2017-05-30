@@ -12,6 +12,12 @@ apt-get install gcc-x.y-plugin-dev
 
 where x.y corresponds to the version of GCC installed on your computer.
 
+Testing:
+
+$ make test
+
+should result in a test.out and an a.out file if everything built.
+
 Running:
 
 When compiling with gcc, use these extra command line flags to use the
