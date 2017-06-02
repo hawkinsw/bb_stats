@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <assert.h>
+#include "options.h"
 
 int plugin_is_GPL_compatible;
 
@@ -91,7 +92,7 @@ static unsigned int bb_pass_execute(void)
 int usage(void)
 {
 	fprintf(stderr, "usage: -fplugin=<path to bb_stats.so>/bb_stats.so\n");
-	fprintf(stderr, "       -fplugin-arg-bb_stats-output=<output filename>\n");
+	fprintf(stderr, "      [-fplugin-arg-bb_stats-output=<output filename>]\n");
 	return 1;
 }
 
@@ -99,12 +100,28 @@ int plugin_init(struct plugin_name_args *plugin_info,
                 struct plugin_gcc_version *version)
 {
 	struct register_pass_info pass_info;
+	char *filename = NULL;
 
-	if (plugin_info->argc != 1)
-		return usage();
+	if (plugin_info->argc == 1)
+	{
+		if (strcmp(plugin_info->argv[0].key, "output"))
+			return usage();
+		filename = plugin_info->argv[0].value;
+	}
+	else
+	{
+		unsigned int filename_alloc_len=(strlen(main_input_filename)+1+3);
+		filename_alloc_len *= sizeof(char);
 
-	if (strcmp(plugin_info->argv[0].key, "output"))
-		return usage();
+		filename = (char*)xmalloc(filename_alloc_len);
+		memset(filename, 0, filename_alloc_len);
+		strcpy(filename, main_input_filename);
+		strcat(filename, ".bb");
+
+		for (int i = 0; i<strlen(filename); i++)
+			if (filename[i] == '/')
+				filename[i] = '_';
+	}
 
 	plugin_options = (struct bb_plugin_options*)xmalloc(sizeof(
 		                struct bb_plugin_options));
@@ -112,7 +129,7 @@ int plugin_init(struct plugin_name_args *plugin_info,
 	memset(plugin_options, 0, sizeof(struct bb_plugin_options));
 	memset(&pass_info, 0, sizeof(struct register_pass_info));
 
-	if (bb_initialize_output(plugin_info->argv[0].value))
+	if (bb_initialize_output(filename))
 		return 1;
 
 	pass_info.reference_pass_name = "final";

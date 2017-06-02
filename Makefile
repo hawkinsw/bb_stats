@@ -11,6 +11,6 @@ test: bb_stats.so
 	gcc -fplugin=./bb_stats.so test.c -fplugin-arg-bb_stats-output="test.out" -g -O0
 
 test-clean:
-	rm -f a.out test.out
+	rm -f a.out test.out *.bb
 clean: test-clean
 	rm -f bb_stats.so
