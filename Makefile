@@ -1,6 +1,6 @@
 HOST_GCC=g++
 TARGET_GCC=gcc
-PLUGIN_SOURCE_FILES=bb_stats.c
+PLUGIN_SOURCE_FILES=bb_stats.cpp
 GCCPLUGINS_DIR:= $(shell $(TARGET_GCC) -print-file-name=plugin)
 CXXFLAGS+= -I$(GCCPLUGINS_DIR)/include -fPIC -fno-rtti
 
